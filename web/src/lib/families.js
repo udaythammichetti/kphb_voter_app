@@ -324,102 +324,16 @@ function roleLabel(member, head, parent) {
     if (member.relationType === 'Husband' && namesMatch(parent.name, member.relationName)) return 'Spouse'
     if (member.relationType === 'Father' && namesMatch(parent.name, member.relationName)) return 'Child'
     if (member.relationType === 'Mother' && namesMatch(parent.name, member.relationName)) return 'Child'
-    // Soft-merged under household head (Branch 2 folded in)
-    if (member._mergedUnderHead) return member.relationType === 'Husband' ? 'Spouse' : 'Family'
   }
   if (member.relationType === 'Husband') return 'Spouse'
   if (member.relationType === 'Father' || member.relationType === 'Mother') return 'Child'
   return member.relationType || 'Member'
 }
 
-function lastToken(name) {
-  const t = tokens(name)
-  return t.length ? t[t.length - 1] : ''
-}
-
-function wouldCreateCycle(parentOf, childEpic, parentEpic) {
-  let cur = parentEpic
-  const seen = new Set()
-  while (cur) {
-    if (cur === childEpic) return true
-    if (seen.has(cur)) return true
-    seen.add(cur)
-    cur = parentOf.get(cur)
-  }
-  return false
-}
-
-/**
- * Attach extra linked roots (UI "Branch 2") under the household head when they
- * look like the same family — avoids parallel trees for one house.
- */
-function mergeSecondaryBranches(parentOf, byEpic, members, head) {
-  if (!head) return
-  const primary = byEpic.get(head.epic) || head
-
-  const linked = new Set([...parentOf.keys(), ...parentOf.values()])
-  linked.add(primary.epic)
-  const childSet = new Set(parentOf.keys())
-  const roots = members.filter((m) => linked.has(m.epic) && !childSet.has(m.epic))
-
-  for (const r of roots) {
-    if (r.epic === primary.epic) continue
-    const node = byEpic.get(r.epic)
-    if (!node) continue
-
-    let attach = false
-
-    // Relation name already points at head (OCR miss on first pass)
-    if (
-      (r.relationType === 'Father' || r.relationType === 'Mother') &&
-      nameMatchScore(r.relationName, primary.name) >= 62 &&
-      ageGapOkParentChild(r, primary)
-    ) {
-      attach = true
-    }
-
-    // Same surname + plausible generation under head
-    const rs = lastToken(r.name)
-    const hs = lastToken(primary.name)
-    if (
-      !attach &&
-      rs &&
-      hs &&
-      tokensClose(rs, hs) &&
-      ageGapOkParentChild(r, primary)
-    ) {
-      attach = true
-    }
-
-    // Husband of someone already under primary → keep spouse cluster under head
-    if (!attach && r.gender === 'Male') {
-      for (const [childEpic, parentEpic] of parentOf.entries()) {
-        if (parentEpic !== r.epic) continue
-        const spouse = byEpic.get(childEpic)
-        if (!spouse || spouse.relationType !== 'Husband') continue
-        // Walk spouse's existing ancestors; if none, age-gap to head is enough with surname
-        const spouseSur = lastToken(spouse.name)
-        if (
-          ageGapOkParentChild(r, primary) &&
-          ((spouseSur && hs && tokensClose(spouseSur, hs)) ||
-            nameMatchScore(spouse.relationName, primary.name) >= 55)
-        ) {
-          attach = true
-          break
-        }
-      }
-    }
-
-    if (!attach) continue
-    if (wouldCreateCycle(parentOf, r.epic, primary.epic)) continue
-    parentOf.set(r.epic, primary.epic)
-    node._mergedUnderHead = true
-  }
-}
-
 /**
  * Link members inside one household into a tree using relation_type + relation_name.
  * Same-house electors with no resolvable name match are returned as unlinked.
+ * Multiple roots = separate linked groups in the house (not force-parented under head).
  */
 export function buildFamilyTree(members) {
   if (!members.length) {
@@ -448,12 +362,6 @@ export function buildFamilyTree(members) {
   const head = pickHead(members, parentOf)
   if (head && parentOf.has(head.epic)) parentOf.delete(head.epic)
 
-  // Fold "Branch 2+" into the main tree when the secondary root belongs under head
-  // (same surname / relation name points at head / spouse of someone already under head).
-  mergeSecondaryBranches(parentOf, byEpic, members, head)
-  resolveParentCycles(parentOf, byEpic)
-
-  // Reset child lists before wiring edges
   for (const node of byEpic.values()) node.children = []
 
   for (const [childEpic, parentEpic] of parentOf.entries()) {
