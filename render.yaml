@@ -1,12 +1,12 @@
 # Render Blueprint — Kukatpally (46) voter dashboard
-# Dashboard → New → Blueprint → connect this repo
+# Use: New → Blueprint (Static Site). Do NOT create a Python Web Service.
 services:
   - type: web
     name: kphb-voter-app
     runtime: static
     rootDir: web
     buildCommand: npm ci --include=dev && npm run build
-    # Path is relative to the repository root (not rootDir)
+    # Relative to repository root
     staticPublishPath: ./web/dist
     routes:
       - type: rewrite

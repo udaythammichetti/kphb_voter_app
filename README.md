@@ -57,14 +57,36 @@ Paths in repo:
 
 ## Deploy on Render
 
-1. Connect this GitHub repo in Render.
-2. Use the Blueprint (`render.yaml`) **or** create a **Static Site**:
-   - **Root directory:** `web`
-   - **Build:** `npm ci --include=dev && npm run build`
-   - **Publish:** `web/dist` (repo-root relative)
-3. Add rewrite: `/*` → `/index.html` (already in Blueprint).
+**Use a Static Site — not a Python Web Service.**  
+If the build runs `pip install -r requirements.txt`, the service type/build command is wrong.
 
-Service name in Blueprint: `kphb-voter-app`.
+### Option A — Blueprint (recommended)
+
+1. **New** → **Blueprint** → repo `udaythammichetti/kphb_voter_app` → branch `main`.
+2. Apply `render.yaml` → service **`kphb-voter-app`**.
+
+### Option B — Manual Static Site
+
+1. **New** → **Static Site** (not Web Service).
+2. Settings:
+
+| Field | Value |
+| --- | --- |
+| Branch | `main` |
+| Root Directory | `web` |
+| Build Command | `npm ci --include=dev && npm run build` |
+| Publish Directory | `dist` |
+
+3. **Redirects/Rewrites** → add rewrite: Source `/*` → Destination `/index.html` → **Rewrite**.
+
+### Fix a failed Python build
+
+1. Open the service → **Settings**.
+2. If it’s a Web Service with Python: delete it and create a **Static Site** (Option B).
+3. Or change **Build Command** to:  
+   `npm ci --include=dev && npm run build`  
+   and set **Publish Directory** to `dist` (with Root Directory `web`).
+4. **Manual Deploy** → clear build cache / deploy latest.
 
 ---
 
@@ -92,7 +114,7 @@ web/                 Vite React app (deploy root)
   src/               UI, locale, export/print
 scripts/             PDF → Excel extract pipeline
 render.yaml          Render static site Blueprint
-requirements.txt     Python deps for scripts
+scripts/requirements.txt  Python deps for extract scripts only
 ```
 
 PDFs (`voter_pdf/`), venv, and OCR scratch are gitignored.
@@ -104,7 +126,7 @@ PDFs (`voter_pdf/`), venv, and OCR scratch are gitignored.
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r scripts/requirements.txt
 # place PDFs under voter_pdf/pdfs/
 ./scripts/run_full_pipeline.sh
 ```
