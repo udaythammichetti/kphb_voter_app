@@ -1,0 +1,65 @@
+:root {
+  color-scheme: dark;
+  --bg0: #0b1410;
+  --bg1: #122019;
+  --bg2: #182820;
+  --line: rgba(214, 227, 214, 0.12);
+  --text: #e8f0e9;
+  --muted: #9aada1;
+  --accent: #d4a35c;
+  --accent-2: #2f8f74;
+  --danger: #e07070;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  font-family: Figtree, system-ui, sans-serif;
+  line-height: 1.45;
+  font-weight: 400;
+  color: var(--text);
+  background: var(--bg0);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  overflow-x: hidden;
+  background:
+    radial-gradient(1000px 500px at 10% -10%, rgba(47, 143, 116, 0.22), transparent 55%),
+    radial-gradient(900px 480px at 95% 0%, rgba(212, 163, 92, 0.16), transparent 50%),
+    linear-gradient(160deg, #0b1410 0%, #101a15 45%, #0d1511 100%);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+h1,
+h2,
+.brand-mark {
+  font-family: 'Bricolage Grotesque', Figtree, sans-serif;
+  letter-spacing: -0.02em;
+}

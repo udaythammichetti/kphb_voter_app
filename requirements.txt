@@ -1,0 +1,7 @@
+pymupdf
+pillow
+openpyxl
+pandas
+ocrmac
+rapidocr-onnxruntime
+onnxruntime
