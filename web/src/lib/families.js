@@ -319,15 +319,23 @@ function pickHead(members, parentOf) {
 }
 
 function roleLabel(member, head, parent) {
+  // Household head (picked for the house)
   if (head && member.epic === head.epic) return 'Head'
+
+  // Only people WITH a parent in the tree are Child / Spouse.
+  // Roll "Father: X" means the relative named is their father — NOT that they are a child here.
   if (parent) {
-    if (member.relationType === 'Husband' && namesMatch(parent.name, member.relationName)) return 'Spouse'
-    if (member.relationType === 'Father' && namesMatch(parent.name, member.relationName)) return 'Child'
-    if (member.relationType === 'Mother' && namesMatch(parent.name, member.relationName)) return 'Child'
+    if (member.relationType === 'Husband' && namesMatch(parent.name, member.relationName)) {
+      return 'Spouse'
+    }
+    if (member.relationType === 'Husband') return 'Spouse'
+    if (member.relationType === 'Father' || member.relationType === 'Mother') return 'Child'
+    return 'Member'
   }
+
+  // Root of a linked group (e.g. Vijaya Kumar Ravva — father not in house)
   if (member.relationType === 'Husband') return 'Spouse'
-  if (member.relationType === 'Father' || member.relationType === 'Mother') return 'Child'
-  return member.relationType || 'Member'
+  return 'Head'
 }
 
 /**
