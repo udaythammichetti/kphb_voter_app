@@ -19,6 +19,13 @@ def run_vite_build() -> None:
     dist = WEB_ROOT / "dist" / "index.html"
     if not dist.is_file():
         raise SystemExit(f"Build failed: missing {dist}")
+    # Also mirror to repo-root dist/ so Publish Directory `dist` works
+    # whether Root Directory is blank or `web`.
+    repo_dist = WEB_ROOT.parent / "dist"
+    if WEB_ROOT.name == "web":
+        subprocess.check_call(["rm", "-rf", str(repo_dist)])
+        subprocess.check_call(["cp", "-R", str(WEB_ROOT / "dist"), str(repo_dist)])
+        print(f"==> kphb: mirrored → {repo_dist / 'index.html'}", flush=True)
     print(f"==> kphb: build ok → {dist}", flush=True)
 
 
