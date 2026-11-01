@@ -68,25 +68,28 @@ If the build runs `pip install -r requirements.txt`, the service type/build comm
 ### Option B — Manual Static Site
 
 1. **New** → **Static Site** (not Web Service).
-2. Settings:
+2. Settings (leave **Root Directory** empty):
 
 | Field | Value |
 | --- | --- |
 | Branch | `main` |
-| Root Directory | `web` |
-| Build Command | `npm ci --include=dev && npm run build` |
-| Publish Directory | `dist` |
+| Root Directory | *(blank)* |
+| Build Command | `npm run build` |
+| Publish Directory | `web/dist` |
 
 3. **Redirects/Rewrites** → add rewrite: Source `/*` → Destination `/index.html` → **Rewrite**.
 
-### Fix a failed Python build
+### Fix a failed `pip install -r requirements.txt` build
 
-1. Open the service → **Settings**.
-2. If it’s a Web Service with Python: delete it and create a **Static Site** (Option B).
-3. Or change **Build Command** to:  
-   `npm ci --include=dev && npm run build`  
-   and set **Publish Directory** to `dist` (with Root Directory `web`).
-4. **Manual Deploy** → clear build cache / deploy latest.
+The Build Command in Render is still set to Python. Change it in the UI (repo changes alone will not override a saved command):
+
+1. Open the service → **Settings** → **Build & Deploy**.
+2. **Build Command** — replace with exactly: `npm run build`
+3. **Publish Directory** — set to: `web/dist` (Static Site only).
+4. Clear **Root Directory** (blank) if it was `web` and you use the root `package.json`.
+5. **Manual Deploy** → **Clear build cache & deploy**.
+
+If it still runs `pip`, delete the service and create a new **Static Site** with Option B.
 
 ---
 

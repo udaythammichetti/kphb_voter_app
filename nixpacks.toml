@@ -1,0 +1,14 @@
+# Force Node on Render (do not use Python / pip).
+providers = ["node"]
+
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+
+[phases.install]
+cmds = ["npm ci --prefix web --include=dev"]
+
+[phases.build]
+cmds = ["npm run build --prefix web"]
+
+[start]
+cmd = "npx --yes serve@14 -s web/dist -l tcp://0.0.0.0:$PORT"

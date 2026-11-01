@@ -1,0 +1,13 @@
+{
+  "name": "kphb-voter-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Kukatpally 46 voter dashboard — build entry for Render",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm ci --prefix web --include=dev && npm run build --prefix web",
+    "start": "npx --yes serve@14 -s web/dist -l tcp://0.0.0.0:$PORT"
+  }
+}

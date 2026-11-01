@@ -1,12 +1,10 @@
-# Render Blueprint — Kukatpally (46) voter dashboard
-# Use: New → Blueprint (Static Site). Do NOT create a Python Web Service.
+# Render Blueprint — use New → Blueprint, or New → Static Site with settings below.
+# Do NOT use a Python Web Service / pip install.
 services:
   - type: web
     name: kphb-voter-app
     runtime: static
-    rootDir: web
-    buildCommand: npm ci --include=dev && npm run build
-    # Relative to repository root
+    buildCommand: npm run build
     staticPublishPath: ./web/dist
     routes:
       - type: rewrite
