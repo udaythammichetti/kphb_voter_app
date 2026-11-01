@@ -136,13 +136,37 @@ function ageSaneParentChild(child, parent) {
   return child.age < parent.age
 }
 
+/** Typical parent/child age gap when both ages are known. */
+const MIN_PARENT_AGE_GAP = 14
+
+function ageGapOkParentChild(child, parent) {
+  if (child?.age == null || parent?.age == null) return true
+  if (!ageSaneParentChild(child, parent)) return false
+  return parent.age - child.age >= MIN_PARENT_AGE_GAP
+}
+
+/**
+ * Likely siblings: both list the same Father/Mother name (actual parent often
+ * absent from the house). Never treat one as the other's parent.
+ */
+function looksLikeSibling(self, other) {
+  if (!self?.relationName || !other?.relationName) return false
+  if (self.relationType !== 'Father' && self.relationType !== 'Mother') return false
+  if (other.relationType !== self.relationType) return false
+  return nameMatchScore(self.relationName, other.relationName) >= 80
+}
+
 function findBestMatch(relationName, members, selfEpic, relationType) {
   const self = members.find((m) => m.epic === selfEpic)
+  const isParentRel = relationType === 'Father' || relationType === 'Mother'
+  // Father/Mother: never accept surname-only (~55). Husband can be a bit looser.
+  const minScore = isParentRel ? 70 : 55
   const scored = []
   for (const o of members) {
     if (o.epic === selfEpic) continue
+    if (isParentRel && looksLikeSibling(self, o)) continue
     let score = nameMatchScore(relationName, o.name)
-    if (score < 55) continue
+    if (score < minScore) continue
     if (relationType === 'Father' || relationType === 'Husband') {
       if (o.gender === 'Male') score += 8
       else if (o.gender === 'Female') score -= 12
@@ -150,20 +174,26 @@ function findBestMatch(relationName, members, selfEpic, relationType) {
       if (o.gender === 'Female') score += 8
       else if (o.gender === 'Male') score -= 12
     }
-    // Prefer older for Father/Mother; reject age-inverted candidates
-    if (relationType === 'Father' || relationType === 'Mother') {
-      if (!ageSaneParentChild(self, o)) continue
+    if (isParentRel) {
+      if (!ageGapOkParentChild(self, o)) continue
       const gap = (o.age ?? 0) - (self?.age ?? 0)
-      if (gap >= 14) score += 6
-      else if (gap >= 8) score += 3
-      else score += Math.min(2, (o.age ?? 0) / 40)
+      if (gap >= 20) score += 8
+      else if (gap >= 14) score += 5
+    } else if (relationType === 'Husband') {
+      // Prefer spouse-like ages; demote much-older father-in-law collisions
+      if (self?.age != null && o.age != null) {
+        const gap = Math.abs(o.age - self.age)
+        if (gap <= 12) score += 6
+        else if (gap <= 20) score += 2
+        else if (gap >= 25) score -= 10
+      }
     }
     scored.push({ member: o, score })
   }
   if (!scored.length) return null
-  scored.sort((a, b) => b.score - a.score)
-  // Surname-only matches must be unique enough
-  if (scored[0].score < 62) {
+  scored.sort((a, b) => b.score - a.score || (b.member.age ?? 0) - (a.member.age ?? 0))
+  // Weak Husband-only: must be unique in house
+  if (!isParentRel && scored[0].score < 62) {
     const near = scored.filter((s) => s.score >= 55)
     if (near.length !== 1) return null
   }
@@ -238,7 +268,7 @@ function resolveParentCycles(parentOf, byEpic) {
       if (!child || !parent) continue
       if (
         (child.relationType === 'Father' || child.relationType === 'Mother') &&
-        !ageSaneParentChild(child, parent)
+        !ageGapOkParentChild(child, parent)
       ) {
         drop = childEpic
         break
@@ -294,10 +324,97 @@ function roleLabel(member, head, parent) {
     if (member.relationType === 'Husband' && namesMatch(parent.name, member.relationName)) return 'Spouse'
     if (member.relationType === 'Father' && namesMatch(parent.name, member.relationName)) return 'Child'
     if (member.relationType === 'Mother' && namesMatch(parent.name, member.relationName)) return 'Child'
+    // Soft-merged under household head (Branch 2 folded in)
+    if (member._mergedUnderHead) return member.relationType === 'Husband' ? 'Spouse' : 'Family'
   }
   if (member.relationType === 'Husband') return 'Spouse'
   if (member.relationType === 'Father' || member.relationType === 'Mother') return 'Child'
   return member.relationType || 'Member'
+}
+
+function lastToken(name) {
+  const t = tokens(name)
+  return t.length ? t[t.length - 1] : ''
+}
+
+function wouldCreateCycle(parentOf, childEpic, parentEpic) {
+  let cur = parentEpic
+  const seen = new Set()
+  while (cur) {
+    if (cur === childEpic) return true
+    if (seen.has(cur)) return true
+    seen.add(cur)
+    cur = parentOf.get(cur)
+  }
+  return false
+}
+
+/**
+ * Attach extra linked roots (UI "Branch 2") under the household head when they
+ * look like the same family — avoids parallel trees for one house.
+ */
+function mergeSecondaryBranches(parentOf, byEpic, members, head) {
+  if (!head) return
+  const primary = byEpic.get(head.epic) || head
+
+  const linked = new Set([...parentOf.keys(), ...parentOf.values()])
+  linked.add(primary.epic)
+  const childSet = new Set(parentOf.keys())
+  const roots = members.filter((m) => linked.has(m.epic) && !childSet.has(m.epic))
+
+  for (const r of roots) {
+    if (r.epic === primary.epic) continue
+    const node = byEpic.get(r.epic)
+    if (!node) continue
+
+    let attach = false
+
+    // Relation name already points at head (OCR miss on first pass)
+    if (
+      (r.relationType === 'Father' || r.relationType === 'Mother') &&
+      nameMatchScore(r.relationName, primary.name) >= 62 &&
+      ageGapOkParentChild(r, primary)
+    ) {
+      attach = true
+    }
+
+    // Same surname + plausible generation under head
+    const rs = lastToken(r.name)
+    const hs = lastToken(primary.name)
+    if (
+      !attach &&
+      rs &&
+      hs &&
+      tokensClose(rs, hs) &&
+      ageGapOkParentChild(r, primary)
+    ) {
+      attach = true
+    }
+
+    // Husband of someone already under primary → keep spouse cluster under head
+    if (!attach && r.gender === 'Male') {
+      for (const [childEpic, parentEpic] of parentOf.entries()) {
+        if (parentEpic !== r.epic) continue
+        const spouse = byEpic.get(childEpic)
+        if (!spouse || spouse.relationType !== 'Husband') continue
+        // Walk spouse's existing ancestors; if none, age-gap to head is enough with surname
+        const spouseSur = lastToken(spouse.name)
+        if (
+          ageGapOkParentChild(r, primary) &&
+          ((spouseSur && hs && tokensClose(spouseSur, hs)) ||
+            nameMatchScore(spouse.relationName, primary.name) >= 55)
+        ) {
+          attach = true
+          break
+        }
+      }
+    }
+
+    if (!attach) continue
+    if (wouldCreateCycle(parentOf, r.epic, primary.epic)) continue
+    parentOf.set(r.epic, primary.epic)
+    node._mergedUnderHead = true
+  }
 }
 
 /**
@@ -319,7 +436,7 @@ export function buildFamilyTree(members) {
     // Final age gate for parent/child edges (Husband may be younger than wife)
     if (
       (m.relationType === 'Father' || m.relationType === 'Mother') &&
-      !ageSaneParentChild(m, match)
+      !ageGapOkParentChild(m, match)
     ) {
       continue
     }
@@ -331,10 +448,28 @@ export function buildFamilyTree(members) {
   const head = pickHead(members, parentOf)
   if (head && parentOf.has(head.epic)) parentOf.delete(head.epic)
 
+  // Fold "Branch 2+" into the main tree when the secondary root belongs under head
+  // (same surname / relation name points at head / spouse of someone already under head).
+  mergeSecondaryBranches(parentOf, byEpic, members, head)
+  resolveParentCycles(parentOf, byEpic)
+
+  // Reset child lists before wiring edges
+  for (const node of byEpic.values()) node.children = []
+
   for (const [childEpic, parentEpic] of parentOf.entries()) {
-    byEpic.get(parentEpic).children.push(byEpic.get(childEpic))
-    byEpic.get(childEpic).linked = true
-    byEpic.get(parentEpic).linked = true
+    const parent = byEpic.get(parentEpic)
+    const child = byEpic.get(childEpic)
+    if (!parent || !child) continue
+    parent.children.push(child)
+    child.linked = true
+    parent.linked = true
+  }
+
+  // Oldest children first under each parent
+  for (const node of byEpic.values()) {
+    if (node.children?.length > 1) {
+      node.children.sort((a, b) => (b.age ?? 0) - (a.age ?? 0) || String(a.name).localeCompare(String(b.name)))
+    }
   }
 
   const linkedEpics = new Set()

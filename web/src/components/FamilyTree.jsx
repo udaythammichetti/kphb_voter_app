@@ -136,7 +136,9 @@ export default function FamilyTree({ family }) {
               {linkedRoots.map((root, idx) => (
                 <div className="ft-ped-block" key={root.epic}>
                   {linkedRoots.length > 1 ? (
-                    <p className="ft-ped-label">Branch {idx + 1}</p>
+                    <p className="ft-ped-label">
+                      {idx === 0 ? 'Main family' : `Other group in house (${idx + 1})`}
+                    </p>
                   ) : null}
                   <PedigreeTree root={root} />
                 </div>
