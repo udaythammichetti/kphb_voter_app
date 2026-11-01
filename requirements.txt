@@ -1,0 +1,3 @@
+# If Render Build Command is still `pip install -r requirements.txt`, this
+# installs a tiny helper that runs the Vite/npm production build.
+./web/_render_npm_build
